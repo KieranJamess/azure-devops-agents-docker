@@ -1,0 +1,27 @@
+trigger: 
+  branches: 
+    include: 
+    - 'master'
+
+pool: 'Docker Build Pool' 
+
+variables: 
+- group: Universal 
+- name: ProjectName 
+  value: $(Build.Repository.Name) 
+
+# Example pipeline. Normally would have the template file in seperate repo.
+
+resources: 
+  repositories: 
+    - repository: templates 
+      type: git 
+      name: template
+
+jobs: 
+- job: Deploy_App 
+  steps: 
+  - template: deploy-to-kubernetes.yml@templates 
+    parameters: 
+      ProjectName: $(ProjectName) 
+      clusterSP: shared-cluster

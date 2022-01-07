@@ -1,0 +1,110 @@
+parameters: 
+- name: 'ProjectName' 
+  type: string 
+  default: $(Build.Repository.Name) 
+- name: 'clusterSP' 
+  type: string 
+- name: 'CheckForDockerfile' 
+  default: true 
+- name: containerServiceConnection 
+  default: ACR CapitalOnTap 
+- name: 'dockerfileLocation' 
+  default: './dockerfile' 
+  type: string 
+
+# The check for dockerfile parameter is there just in case the repo is using an existing docker image from a different repo. This gives the option to skip over the docker build
+
+steps: 
+    - ${{if eq(parameters.CheckForDockerfile, false)}}: 
+        - checkout: self 
+          clean: true 
+          submodules: true 
+        - task: Kubernetes@1 
+          continueOnError: true 
+          displayName: Check for namespace 
+          inputs: 
+            connectionType: Kubernetes Service Connection 
+            kubernetesServiceEndpoint: ${{ parameters.clusterSP }} 
+            command: create 
+            arguments: namespace ${{ parameters.ProjectName }} 
+        - task: replacetokens@3 
+          displayName: Replace tokens 
+          inputs: 
+            targetFiles: '**/kubernetes/*.yaml' 
+            encoding: 'auto' 
+            writeBOM: true 
+            actionOnMissing: 'warn' 
+            keepToken: false 
+            tokenPrefix: '${' 
+            tokenSuffix: '}' 
+            useLegacyPattern: false 
+            enableTransforms: false 
+            enableTelemetry: true 
+        - task: Kubernetes@1 
+          displayName: Deploy 
+          inputs: 
+            connectionType: Kubernetes Service Connection 
+            kubernetesServiceEndpoint: ${{ parameters.clusterSP }} 
+            command: apply 
+            arguments: -f kubernetes -n ${{ parameters.ProjectName }} 
+    - ${{if eq(parameters.CheckForDockerfile, true)}}: 
+        - checkout: self 
+          clean: true 
+          submodules: true 
+        - task: PowerShell@2 
+          displayName: Find Docker File 
+          inputs:  
+            targetType: inline 
+            script: | 
+              $fileExists = Test-Path -Path "$(System.DefaultWorkingDirectory)/dockerfile" 
+              Write-Output "##vso[task.setvariable variable=FileExists]$fileExists" 
+        - task: Docker@2 
+          condition: eq(variables['FileExists'], True) 
+          displayName: Login to ACR 
+          inputs: 
+            command: login 
+            containerRegistry: ${{parameters.containerServiceConnection}} 
+        - task: Docker@2 
+          condition: eq(variables['FileExists'], True) 
+          displayName: BuildPush 
+          inputs: 
+            command: buildAndPush 
+            Dockerfile: ${{ parameters.dockerfileLocation }} 
+            repository: ${{ parameters.ProjectName }} 
+            tags: | 
+              latest 
+              $(build.buildid) 
+        - task: Docker@2 
+          condition: eq(variables['FileExists'], True) 
+          displayName: Logout of ACR 
+          inputs: 
+            command: logout 
+            containerRegistry: ${{parameters.containerServiceConnection}} 
+        - task: Kubernetes@1 
+          continueOnError: true 
+          displayName: Check for namespace 
+          inputs: 
+            connectionType: Kubernetes Service Connection 
+            kubernetesServiceEndpoint: ${{ parameters.clusterSP }} 
+            command: create 
+            arguments: namespace ${{ parameters.ProjectName }} 
+        - task: replacetokens@3 
+          displayName: Replace tokens 
+          inputs: 
+            targetFiles: '**/kubernetes/*.yaml' 
+            encoding: 'auto' 
+            writeBOM: true 
+            actionOnMissing: 'warn' 
+            keepToken: false 
+            tokenPrefix: '${' 
+            tokenSuffix: '}' 
+            useLegacyPattern: false 
+            enableTransforms: false 
+            enableTelemetry: true 
+        - task: Kubernetes@1 
+          displayName: Deploy 
+          inputs: 
+            connectionType: Kubernetes Service Connection 
+            kubernetesServiceEndpoint: ${{ parameters.clusterSP }} 
+            command: apply 
+            arguments: -f kubernetes -n ${{ parameters.ProjectName }}
