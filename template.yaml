@@ -7,7 +7,7 @@ parameters:
 - name: 'CheckForDockerfile' 
   default: true 
 - name: containerServiceConnection 
-  default: ACR CapitalOnTap 
+  default: ACR
 - name: 'dockerfileLocation' 
   default: './dockerfile' 
   type: string 
