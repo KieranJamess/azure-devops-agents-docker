@@ -22,7 +22,7 @@ spec:
         emptyDir: {} 
       containers: 
       - name: ${ProjectName} 
-        image: capitalontap.azurecr.io/${ProjectName}:${build.buildid} 
+        image: acr.azurecr.io/${ProjectName}:${build.buildid} 
         imagePullPolicy: IfNotPresent 
         securityContext: 
           privileged: true 
